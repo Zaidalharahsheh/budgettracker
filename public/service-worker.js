@@ -1,81 +1,67 @@
-
-
-
 const FILES_TO_CACHE = [
-    `/indexchange.js`,
-    `/index.html`,
-    `/index.js`,
-    `/styles.css`,
-    `/manifest.webmanifest`,
-    `/icons/icon-512x512.png`
+    "/",
+    "/index.html",
+    "/index.js",
+    "/manifest.webmanifest",
+    "/styles.css",
+    
+    "/icons/icon-512x512.png"
 ];
 
-const STATIC_CACHE = `static-cache-v1`;
-const RUNTIME_CACHE = `runtime-cache`;
+const CACHE_NAME = "static-cache-v2";
+const DATA_CACHE_NAME = "data-cache-v1";
 
-self.addEventListener(`install`, event => {
-    event.waitUntil(
-        caches
-            .open(STATIC_CACHE)
-            .then(cache => cache.addAll(FILES_TO_CACHE))
-            .then(() => self.skipWaiting())
+self.addEventListener("install", function (evt) {
+    evt.waitUntil(
+        caches.open(CACHE_NAME).then(cache => {
+            console.log("Your files have been cached successfully!");
+            return cache.addAll(FILES_TO_CACHE);
+        })
     );
+    self.skipWaiting();
+})
+
+self.addEventListener("activate", function (evt) {
+    evt.waitUntil(
+        caches.keys().then(keyList => {
+            return Promise.all(
+                keyList.map(key => {
+                    if (key !== CACHE_NAME && key !== DATA_CACHE_NAME) {
+                        console.log("Removing old cache data", key);
+                        return caches.delete(key);
+                    }
+                })
+            );
+        })
+    );
+    self.clients.claim();
 });
 
-self.addEventListener(`activate`, event => {
-    const currentCaches = [STATIC_CACHE, RUNTIME_CACHE];
-    event.waitUntil(
-        caches
-            .keys()
-            .then(cacheNames =>
-       
-                cacheNames.filter(cacheName => !currentCaches.includes(cacheName))
-            )
-            .then(cachesToDelete =>
-                Promise.all(
-                    cachesToDelete.map(cacheToDelete => caches.delete(cacheToDelete))
-                )
-            )
-            .then(() => self.clients.claim())
-    );
-});
+self.addEventListener("fetch", function (evt) {
+    if (evt.request.url.includes("/api/transaction")) {
+        console.log("[Service Worker] Fetch (data)", evt.request.url);
 
-self.addEventListener(`fetch`, event => {
-    if (
-        event.request.method !== `GET` ||
-        !event.request.url.startsWith(self.location.origin)
-    ) {
-        event.respondWith(fetch(event.request));
-        return;
-    }
-
-    if (event.request.url.includes(`/api/transaction`)) {
-        event.respondWith(
-            caches.open(RUNTIME_CACHE).then(cache =>
-                fetch(event.request)
+        evt.respondWith(
+            caches.open(DATA_CACHE_NAME).then(cache => {
+                return fetch(evt.request)
                     .then(response => {
-                        cache.put(event.request, response.clone());
+                        if (response.status === 200) {
+                            cache.put(evt.request.url, response.clone());
+                        }
                         return response;
                     })
-                    .catch(() => caches.match(event.request))
-            )
+                    .catch(err => {
+                        return cache.match(evt.request);
+                    });
+            })
         );
         return;
     }
-
-    event.respondWith(
-        caches.match(event.request).then(cachedResponse => {
-            if (cachedResponse) {
-                return cachedResponse;
-            }
-
-            return caches
-                .open(RUNTIME_CACHE)
-                .then(cache =>
-                    fetch(event.request).then(response =>
-                        cache.put(event.request, response.clone()).then(() => response)
-                    )
-                );
+    evt.respondWith(
+        caches.open(CACHE_NAME).then(cache => {
+            return cache.match(evt.request).then(response => {
+                return response || fetch(evt.request);
+            });
         })
-    );
-});
+    )
+})
