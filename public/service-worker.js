@@ -1,5 +1,5 @@
 
-console.log('This is your service-worker.js file!');
+
 
 const FILES_TO_CACHE = [
     `/indexchange.js`,

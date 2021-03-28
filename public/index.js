@@ -6,7 +6,7 @@ fetch("/api/transaction")
     return response.json();
   })
   .then(data => {
-
+    // save db data on global variable
     transactions = data;
 
     populateTotal();
@@ -15,7 +15,7 @@ fetch("/api/transaction")
   });
 
 function populateTotal() {
-
+  // reduce transaction amounts to a single total value
   let total = transactions.reduce((total, t) => {
     return total + parseInt(t.value);
   }, 0);
@@ -29,7 +29,7 @@ function populateTable() {
   tbody.innerHTML = "";
 
   transactions.forEach(transaction => {
-    
+    // create and populate a table row
     let tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${transaction.name}</td>
@@ -41,7 +41,7 @@ function populateTable() {
 }
 
 function populateChart() {
-  // copy array 
+  // copy array and reverse it
   let reversed = transactions.slice().reverse();
   let sum = 0;
 
@@ -51,12 +51,13 @@ function populateChart() {
     return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
   });
 
+  // create incremental values for chart
   let data = reversed.map(t => {
     sum += parseInt(t.value);
     return sum;
   });
 
-
+  // remove old chart if it exists
   if (myChart) {
     myChart.destroy();
   }
@@ -82,7 +83,7 @@ function sendTransaction(isAdding) {
   let amountEl = document.querySelector("#t-amount");
   let errorEl = document.querySelector(".form .error");
 
-
+  // validate form
   if (nameEl.value === "" || amountEl.value === "") {
     errorEl.textContent = "Missing Information";
     return;
@@ -97,15 +98,16 @@ function sendTransaction(isAdding) {
     value: amountEl.value,
     date: new Date().toISOString()
   };
-r
+
+  // if subtracting funds, convert amount to negative number
   if (!isAdding) {
     transaction.value *= -1;
   }
 
-
+  // add to beginning of current array of data
   transactions.unshift(transaction);
 
-  
+  // re-run logic to populate ui with new record
   populateChart();
   populateTable();
   populateTotal();
@@ -133,9 +135,10 @@ r
     }
   })
   .catch(err => {
-
+    // fetch failed, so save in indexed db
     saveRecord(transaction);
 
+    // clear form
     nameEl.value = "";
     amountEl.value = "";
   });
